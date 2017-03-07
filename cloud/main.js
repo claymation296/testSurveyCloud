@@ -3,11 +3,12 @@
 // use request.log.info() in lieu of console.log()
 
 
-const utils     = require('./utilities.js');
-const Mailer    = require('./mailer.js'); // https://github.com/m1gu3l/parse-sendgrid-mailer
-const redaapPDF = require('./redaappdf.js');
-const private   = require('../private-credentials/private.js');
-const pricingJs = require('./pricing.js');
+const utils       = require('./utilities.js');
+const Mailer      = require('./mailer.js'); // https://github.com/m1gu3l/parse-sendgrid-mailer
+const redaapPDF   = require('./redaappdf.js');
+const private     = require('../private-credentials/private.js');
+const pricingJs   = require('./pricing.js');
+const procurement = require('./procurement.js');
 
 
 
@@ -281,7 +282,7 @@ Parse.Cloud.define('review', (request, response) => {
 
     return orderObj.save(null, {useMasterKey: true});
   }).then(() => {
-    // send all the data need to create a pdf to the redaappdf.js module
+    // send all the data needed to create a pdf to the redaappdf.js module
     const pdfData = {user, pricing, survey, client, orderNum};
     // redaappdf.js module
     const base64  = redaapPDF.makePDF(pdfData);
@@ -347,27 +348,59 @@ Parse.Cloud.define('review', (request, response) => {
                     </div>`;
 
     const body = emailHtml + footer;   
-    // create and send the email  
+    // create and send the email 
+    return mailer.
+      mail().
+      property('to',      'thomas@redaap.com').
+      property('toName',  'Thomas Carpenter').
+      property('from',    'REDAAPReview').
+      property('subject', 'Please Review').
+      property('html',     body).
+      send();
 
 
 
 
+// testing procurement csv file output ******************************************
 
-// commented out for testing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  // }).then(() => {
 
-//    return mailer.
-//      mail().
-//      property('to',      'thomas@redaap.com').
-//      property('toName',  'Thomas Carpenter').
-//      property('from',    'REDAAPReview').
-//      property('subject', 'Please Review').
-//      property('html',     body).
-//      send();
+  //   return procurement.csvFileBuffer(survey);
+  // }).then(csvBuffer => {
+  //   // rendered in email body
+  //   const repName  = `${user.get('first')} ${user.get('last')}`;
+  //   const repPhone = repData.get('phone');
+  //   const repEmail = user.get('username');
+  //   // email body
+  //   // client === {clientName, phone, email, companyName, address, city, state, zip}
+  //   const emailHtml = `<div>Client:</div> 
+  //                      <div>${client.clientName}</div> 
+  //                      <div>${client.companyName}</div>
+  //                      <div>${client.address}</div>
+  //                      <div>${client.city}, ${client.state} ${client.zip}</div> 
+  //                      <div>${client.phone}</div> 
+  //                      <div>${client.email}</div>`;
+  //   // added to end of email body
+  //   const footer = `<div style="margin: 32px 0px;">
+  //                     <div>Rep:</div>
+  //                     <div>${repName}</div>
+  //                     <div>${repPhone}</div>
+  //                     <div>${repEmail}</div>
+  //                   </div>`;
 
-// commented out for testing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  //   const body = emailHtml + footer;   
 
+  //   return mailer.
+  //     mail().
+  //     property('to',      'peterc@teulights.com').
+  //     property('toName',  'Peter Carpenter').
+  //     property('from',    'REDAAPReview').
+  //     property('subject', `${client.companyName} quote to review`).
+  //     property('html',     body).
+  //     attach('procurement.csv', 'text/csv', csvBuffer).
+  //     send();
 
-
+  // testing procurement csv file output ******************************************
 
 
   }).then(() => {
