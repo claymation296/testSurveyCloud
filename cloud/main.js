@@ -8,190 +8,104 @@ const Mailer      = require('./mailer.js'); // https://github.com/m1gu3l/parse-s
 const redaapPDF   = require('./redaappdf.js');
 const private     = require('../private-credentials/private.js');
 const pricingJs   = require('./pricing.js');
-const procurement = require('./procurement.js');
+const bomCsv      = require('./bomcsv.js');
 
 
 
 
 
 
-
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%% 'search' is current for v0.4.6 %%%%%%%%%%%%%%%%%%%%%%%%%%
-
-// search:
-//        search the db for previously saved surveys for editing inside the app
-Parse.Cloud.define('search', (request, response) => {
-  // only allow users from the same company to search for and edit each others surveys
-  const {params, user}          = request;
-  const {userSurveys, col, str} = params;
-  // the trusted class is used to sign up new users and also contains sensitive info about
-  // each user including the company they work for
-  // use the company data in order to restrict any query to only those that belong to the
-  // same company as the user who is requesting the data
-  const Trusted      = Parse.Object.extend('Trusted');
-  const trustedQuery = new Parse.Query(Trusted);
-  // user.moreData contains the objectId of the Trusted Class object that is tied to user
-  // it has the rep's company name which is used to restrict the search to surveys
-  // that belong to that company only
-  let moreData;
-  const results = {};
-
-  const runBothQueries = (lowerCaseQuery, capitalizedQuery) => {
-    // restrict to only same company data
-    lowerCaseQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
-    if (userSurveys) {
-      lowerCaseQuery.equalTo('repFirstName', user.get('first'));
-      lowerCaseQuery.equalTo('repLastName', user.get('last'));
-    }
-    // optional filtering of survey query by user
-    // they can provide an extra column to search and string to match
-    // search for both the all lower cased string as well as the same string
-    // with the first letter capitalized
-    if (col && str) {
-      if (col === 'orderNum') {
-        lowerCaseQuery.equalTo('orderNum', Number(str));
-      } else {
-        // normalize user input string for search
-        const lowerCaseString = str.toLowerCase();
-        // make a capitalized version of the str
-        const capQueryString = utils.capFirst(str);
-        // make a second query for the case where the user wants to filter the 
-        // results by SurveyData Class column
-        // in this case, search for the results filtered by an all lowercase string
-        // as well as the same string with its first letter capitalized to make 
-        // the search more case insensitive
-        capitalizedQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
-
-        if (userSurveys) {
-          capitalizedQuery.equalTo('repFirstName', user.get('first'));
-          capitalizedQuery.equalTo('repLastName', user.get('last'));
-        }
-        // add constraints to both queries
-        lowerCaseQuery.startsWith(col, lowerCaseString);
-        capitalizedQuery.startsWith(col, capQueryString);
-        // Parse allows the union of two seperate queries with the Parse.Query.or method
-        const bothQueries = Parse.Query.or(lowerCaseQuery, capitalizedQuery);
-        // pass data back in chronological order of newest first
-        bothQueries.descending('createdAt');
-        bothQueries.limit(10);
-
-        return bothQueries.find();
-      }
-    }
-    // pass data back in chronological order of newest first
-    lowerCaseQuery.descending('createdAt');
-    lowerCaseQuery.limit(10);
-
-    return lowerCaseQuery.find();
-  };
-
-
-  const upperAndLowerCaseQueries = classStr => {
-    const classObj   = Parse.Object.extend(classStr);
-    const lowerQuery = new Parse.Query(classObj);
-    const upperQuery = new Parse.Query(classObj);
-
-    return runBothQueries(lowerQuery, upperQuery); 
-  };
-
-
-  trustedQuery.get(user.get('moreData'), {useMasterKey: true}).then(moredata => {
-    moreData = moredata;
-    // terminate the promise if there is no signed in user
-    if (!user) {
-      return Parse.Promise.error('{"message": "you must sign up or log in ' + 
-        'before you can use this feature"}');
-    }
-    // cannot promise.all or promise.when with Parse.Query.or
-    return upperAndLowerCaseQueries('SavedForLater');
-  }).then(saved => {
-    results.saved = saved;
-    return upperAndLowerCaseQueries('QuotesToReview');
-  }).then(review => {
-    results.review = review;
-    return upperAndLowerCaseQueries('SentQuotes');
-  }).then(sent => {
-    results.sent = sent;
-    // check if no results were found and if email and password strings exist
-    if (!results.saved.length && !results.review.length && !results.sent.length) {
-      return Parse.Promise.error('{"message": "we could not find the surveys you searched for"}');
-    }
-
-    response.success(results);
-  }).catch(error => {
-    response.error(error);
-  }); 
-});
-
-
-
-
-
-// %%%%%%%%%%%%%%%%%%%%%%%%% 'photos' is current for v0.3.3 %%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-// photos:
-//        labeled photos for machine learning algorithm training
-//        each image is saved by the front-end fileUpload() function inside woker.js
-//        because cloud code will no accept much raw data as a payload
-//        The workaround solutions requires the images to be uploaded/saved to Parse by
-//        using the js api to save each Parse.File then this cloud func to associate the
-//        files to a Parse.Object
-Parse.Cloud.define('photos', (request, response) => {
+// sendBom: 
+//        receives client and survey data as well as a signature capture
+//        it saves all the data then sends out and email with an attached pdf
+//        to the client along with a bcc to TEU
+Parse.Cloud.define('sendBom', (request, response) => {
   const {params, user} = request;
-  const {uploaded}     = params;
-  // associate photos to their own Parse.Object along with the order number pointer
-  const Photos = Parse.Object.extend('MLphotos');
-  const saves  = [];
-  // store unique fixture names so duplicates can be saved to their own row
-  const names  = {};
-  let columns  = [];
-  // creates a new row in the 'MLphotos' class so any duplicate photos
-  // will have their own rows since only one file can be associeated
-  // per column
-  const saveRow = cols => {
-    // create new row
-    const photos = new Photos();
-    // set cols
-    cols.forEach(column => {
-      // column names strings cannot start with a number ie. 2ftt8t12
-      const colName = `ml${column.columnName}`;
-      photos.set(colName, column.imageFile);
-    });
-    // for Parse.Promise.when
-    saves.push(photos.save());
-  };  
-  // sift through uploaded photos and create a new row anytime 
-  // multiple photos of the same fixture are found
-  uploaded.forEach(upload => {
-    // ie. tfssba9baa8c2eaa4bcca7d7a11a1c3f7e98_468can.png --> 468can
-    const columnName = upload._name.split('_').pop().split('.').shift();
-    // the Parse.File association
-    const imageFile  = {__type: "File", name: upload._name, url: upload._url};
-    // passed into saveRow
-    const column     = {columnName, imageFile};
-    // check if the current fixture type already has a photo saved to it
-    // if so, make a new row
-    if (names[columnName]) {
-      saveRow(columns);
-      // reset columns and start with the column duplicate
-      names[columnName] = false;
-      columns           = [column];
-    } else {
-      // new and unique fixture type
-      names[columnName] = true;
-      columns.push(column);
-    }
-  });
-  // run saveRow for last row
-  saveRow(columns);
-  // save in parallel
-  Parse.Promise.when(saves).then(() => {
+  const {bom, client}  = params;
+  // setup email generator instance
+  const mailer = new Mailer(private.username, private.pw);
+  let repData;
+  // get a pointer to the user's company so later they may search saved surveys 
+  // from other reps in that company as well
+  // user.moreData is a pointer to the 'Trusted' Class row that contains the 
+  // rep's company name
+  const RepData      = Parse.Object.extend('Trusted');
+  const repDataQuery = new Parse.Query(RepData);
+  // user.moreData === Trusted.objectId
+  repDataQuery.get(user.get('moreData'), {useMasterKey: true}).then(moreData => {
     // make sure there was an authenticated user making the request
     if (!user) {
       return Parse.Promise.error('{"message": "you must sign up or log in ' + 
-        'before you can use this feature"}');
+                                 'before you can use this feature"}');
     }
-    response.success('photos saved');
+    repData = moreData;
+
+    return bomCsv.csvFileBuffer(bom);
+  }).then(csvBuffer => {
+    // rendered in email body
+    const repName  = `${user.get('first')} ${user.get('last')}`;
+    const repPhone = repData.get('phone');
+    const repEmail = user.get('username');
+    // email body
+    // client === {clientName, phone, email, companyName, address, city, state, zip}
+    const emailHtml = `<div>Client:</div> 
+                       <div>${client.clientName}</div> 
+                       <div>${client.companyName}</div>
+                       <div>${client.address}</div>
+                       <div>${client.city}, ${client.state} ${client.zip}</div> 
+                       <div>${client.phone}</div> 
+                       <div>${client.email}</div>`;
+    // added to end of email body
+    const footer = `<div style="margin: 32px 0px;">
+                      <div>Rep:</div>
+                      <div>${repName}</div>
+                      <div>${repPhone}</div>
+                      <div>${repEmail}</div>
+                    </div>`;
+
+    const body = emailHtml + footer;   
+
+    return mailer.
+      mail().
+      property('to',      'peterc@teulights.com').
+      property('toName',  'Peter Carpenter').
+      property('from',    'RedaapBillofMaterials').
+      property('subject', `${client.companyName} bill of materials`).
+      property('html',     body).
+      attach('bom.csv',   'text/csv', csvBuffer).
+      send();
+
+  }).then(() => {  
+
+    const Saved = Parse.Object.extend('savedBom');
+    const saved = new Saved();
+
+
+    // TODO: 
+    //      make proper acl's so any rep who belongs to a particular company may edit
+    //      any survey from other reps in that company for validation or follow-up purposes
+
+    // // lock SentQuotes down so only the rep who created it may read from it in the future
+    // var surveyACL = new Parse.ACL();
+    // surveyACL.setReadAccess(user, true);
+    // surveyACL.setWriteAccess(user, false);
+    // saved.setACL(surveyACL);
+
+    const clientKeys = Object.keys(client);
+    clientKeys.forEach(key => {
+      saved.set(key, client[key]);
+    });
+
+    saved.set('repCompanyName', repData.get('repCompanyName'));
+    saved.set('rep',            user);
+    saved.set('repFirstName',   user.get('first'));
+    saved.set('repLastName',    user.get('last'));
+    saved.set('bom',            bom);
+    saved.set('client',         client);
+     
+    return saved.save();    
+  }).then(() => {
+    response.success('bom saved!');
   }).catch(error => {
     response.error(error);
   }); 
@@ -357,51 +271,6 @@ Parse.Cloud.define('review', (request, response) => {
       property('subject', 'Please Review').
       property('html',     body).
       send();
-
-
-
-
-// testing procurement csv file output ******************************************
-
-  // }).then(() => {
-
-  //   return procurement.csvFileBuffer(survey);
-  // }).then(csvBuffer => {
-  //   // rendered in email body
-  //   const repName  = `${user.get('first')} ${user.get('last')}`;
-  //   const repPhone = repData.get('phone');
-  //   const repEmail = user.get('username');
-  //   // email body
-  //   // client === {clientName, phone, email, companyName, address, city, state, zip}
-  //   const emailHtml = `<div>Client:</div> 
-  //                      <div>${client.clientName}</div> 
-  //                      <div>${client.companyName}</div>
-  //                      <div>${client.address}</div>
-  //                      <div>${client.city}, ${client.state} ${client.zip}</div> 
-  //                      <div>${client.phone}</div> 
-  //                      <div>${client.email}</div>`;
-  //   // added to end of email body
-  //   const footer = `<div style="margin: 32px 0px;">
-  //                     <div>Rep:</div>
-  //                     <div>${repName}</div>
-  //                     <div>${repPhone}</div>
-  //                     <div>${repEmail}</div>
-  //                   </div>`;
-
-  //   const body = emailHtml + footer;   
-
-  //   return mailer.
-  //     mail().
-  //     property('to',      'peterc@teulights.com').
-  //     property('toName',  'Peter Carpenter').
-  //     property('from',    'REDAAPReview').
-  //     property('subject', `${client.companyName} quote to review`).
-  //     property('html',     body).
-  //     attach('procurement.csv', 'text/csv', csvBuffer).
-  //     send();
-
-  // testing procurement csv file output ******************************************
-
 
   }).then(() => {
     response.success('review sent successfully!');
@@ -682,6 +551,192 @@ Parse.Cloud.define('pricing', (request, response) => {
     });
 
     response.success(pricing);
+  }).catch(error => {
+    response.error(error);
+  }); 
+});
+
+
+
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%% 'photos' is current for v0.3.3 %%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// photos:
+//        labeled photos for machine learning algorithm training
+//        each image is saved by the front-end fileUpload() function inside woker.js
+//        because cloud code will no accept much raw data as a payload
+//        The workaround solutions requires the images to be uploaded/saved to Parse by
+//        using the js api to save each Parse.File then this cloud func to associate the
+//        files to a Parse.Object
+Parse.Cloud.define('photos', (request, response) => {
+  const {params, user} = request;
+  const {uploaded}     = params;
+  // associate photos to their own Parse.Object along with the order number pointer
+  const Photos = Parse.Object.extend('MLphotos');
+  const saves  = [];
+  // store unique fixture names so duplicates can be saved to their own row
+  const names  = {};
+  let columns  = [];
+  // creates a new row in the 'MLphotos' class so any duplicate photos
+  // will have their own rows since only one file can be associeated
+  // per column
+  const saveRow = cols => {
+    // create new row
+    const photos = new Photos();
+    // set cols
+    cols.forEach(column => {
+      // column names strings cannot start with a number ie. 2ftt8t12
+      const colName = `ml${column.columnName}`;
+      photos.set(colName, column.imageFile);
+    });
+    // for Parse.Promise.when
+    saves.push(photos.save());
+  };  
+  // sift through uploaded photos and create a new row anytime 
+  // multiple photos of the same fixture are found
+  uploaded.forEach(upload => {
+    // ie. tfssba9baa8c2eaa4bcca7d7a11a1c3f7e98_468can.png --> 468can
+    const columnName = upload._name.split('_').pop().split('.').shift();
+    // the Parse.File association
+    const imageFile  = {__type: "File", name: upload._name, url: upload._url};
+    // passed into saveRow
+    const column     = {columnName, imageFile};
+    // check if the current fixture type already has a photo saved to it
+    // if so, make a new row
+    if (names[columnName]) {
+      saveRow(columns);
+      // reset columns and start with the column duplicate
+      names[columnName] = false;
+      columns           = [column];
+    } else {
+      // new and unique fixture type
+      names[columnName] = true;
+      columns.push(column);
+    }
+  });
+  // run saveRow for last row
+  saveRow(columns);
+  // save in parallel
+  Parse.Promise.when(saves).then(() => {
+    // make sure there was an authenticated user making the request
+    if (!user) {
+      return Parse.Promise.error('{"message": "you must sign up or log in ' + 
+        'before you can use this feature"}');
+    }
+    response.success('photos saved');
+  }).catch(error => {
+    response.error(error);
+  }); 
+});
+
+
+
+
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%% 'search' is current for v0.4.6 %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// search:
+//        search the db for previously saved surveys for editing inside the app
+Parse.Cloud.define('search', (request, response) => {
+  // only allow users from the same company to search for and edit each others surveys
+  const {params, user}          = request;
+  const {userSurveys, col, str} = params;
+  // the trusted class is used to sign up new users and also contains sensitive info about
+  // each user including the company they work for
+  // use the company data in order to restrict any query to only those that belong to the
+  // same company as the user who is requesting the data
+  const Trusted      = Parse.Object.extend('Trusted');
+  const trustedQuery = new Parse.Query(Trusted);
+  // user.moreData contains the objectId of the Trusted Class object that is tied to user
+  // it has the rep's company name which is used to restrict the search to surveys
+  // that belong to that company only
+  let moreData;
+  const results = {};
+
+  const runBothQueries = (lowerCaseQuery, capitalizedQuery) => {
+    // restrict to only same company data
+    lowerCaseQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
+    if (userSurveys) {
+      lowerCaseQuery.equalTo('repFirstName', user.get('first'));
+      lowerCaseQuery.equalTo('repLastName', user.get('last'));
+    }
+    // optional filtering of survey query by user
+    // they can provide an extra column to search and string to match
+    // search for both the all lower cased string as well as the same string
+    // with the first letter capitalized
+    if (col && str) {
+      if (col === 'orderNum') {
+        lowerCaseQuery.equalTo('orderNum', Number(str));
+      } else {
+        // normalize user input string for search
+        const lowerCaseString = str.toLowerCase();
+        // make a capitalized version of the str
+        const capQueryString = utils.capFirst(str);
+        // make a second query for the case where the user wants to filter the 
+        // results by SurveyData Class column
+        // in this case, search for the results filtered by an all lowercase string
+        // as well as the same string with its first letter capitalized to make 
+        // the search more case insensitive
+        capitalizedQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
+
+        if (userSurveys) {
+          capitalizedQuery.equalTo('repFirstName', user.get('first'));
+          capitalizedQuery.equalTo('repLastName', user.get('last'));
+        }
+        // add constraints to both queries
+        lowerCaseQuery.startsWith(col, lowerCaseString);
+        capitalizedQuery.startsWith(col, capQueryString);
+        // Parse allows the union of two seperate queries with the Parse.Query.or method
+        const bothQueries = Parse.Query.or(lowerCaseQuery, capitalizedQuery);
+        // pass data back in chronological order of newest first
+        bothQueries.descending('createdAt');
+        bothQueries.limit(10);
+
+        return bothQueries.find();
+      }
+    }
+    // pass data back in chronological order of newest first
+    lowerCaseQuery.descending('createdAt');
+    lowerCaseQuery.limit(10);
+
+    return lowerCaseQuery.find();
+  };
+
+
+  const upperAndLowerCaseQueries = classStr => {
+    const classObj   = Parse.Object.extend(classStr);
+    const lowerQuery = new Parse.Query(classObj);
+    const upperQuery = new Parse.Query(classObj);
+
+    return runBothQueries(lowerQuery, upperQuery); 
+  };
+
+
+  trustedQuery.get(user.get('moreData'), {useMasterKey: true}).then(moredata => {
+    moreData = moredata;
+    // terminate the promise if there is no signed in user
+    if (!user) {
+      return Parse.Promise.error('{"message": "you must sign up or log in ' + 
+        'before you can use this feature"}');
+    }
+    // cannot promise.all or promise.when with Parse.Query.or
+    return upperAndLowerCaseQueries('SavedForLater');
+  }).then(saved => {
+    results.saved = saved;
+    return upperAndLowerCaseQueries('QuotesToReview');
+  }).then(review => {
+    results.review = review;
+    return upperAndLowerCaseQueries('SentQuotes');
+  }).then(sent => {
+    results.sent = sent;
+    // check if no results were found and if email and password strings exist
+    if (!results.saved.length && !results.review.length && !results.sent.length) {
+      return Parse.Promise.error('{"message": "we could not find the surveys you searched for"}');
+    }
+
+    response.success(results);
   }).catch(error => {
     response.error(error);
   }); 
