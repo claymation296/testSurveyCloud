@@ -67,8 +67,14 @@ Parse.Cloud.define('sendBom', (request, response) => {
 
     return mailer.
       mail().
-      property('to',      'peterc@teulights.com').
-      property('toName',  'Peter Carpenter').
+      // property('to',      'peterc@teulights.com').
+      // property('toName',  'Peter Carpenter').
+      property('to',      'claymation296@gmail.com').
+      property('toName',  'Clay Bennington').
+
+
+
+
       property('from',    'RedaapBillofMaterials').
       property('subject', `${client.companyName} bill of materials`).
       property('html',     body).

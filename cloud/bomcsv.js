@@ -198,8 +198,7 @@ const nameFromKey = key => key.split('_').join(' ');
 const fixtureRow = (areaKey, fixKey, fixture) => {
   const area = nameFromKey(areaKey);
   const type = nameFromKey(fixKey);
-  const {qty, color, lamps, kelvin, watts, volts, base, mount, height, hours, days, contactors, emergency, controls, photos, notes} = fixture;
-  const {dimmer, timer, light, motion} = controls;
+  const {qty, color, lamps, kelvin, watts, volts, base, mount, height, hours, days, contactors, emergency, dimmer, timer, ambient, motion, photos, notes} = fixture;
 
   let urls = '';
 
@@ -212,7 +211,7 @@ const fixtureRow = (areaKey, fixKey, fixture) => {
     }, '');
   }
   
-  const dataStr = `${area}, ${type}, ${qty}, ${color}, ${lamps}, ${kelvin}, ${watts}, ${volts}, ${base}, ${mount}, ${height}, ${hours}, ${days}, ${contactors}, ${emergency}, ${dimmer}, ${timer}, ${light}, ${motion}, ${urls}, ${notes}`;
+  const dataStr = `${area}, ${type}, ${qty}, ${color}, ${lamps}, ${kelvin}, ${watts}, ${volts}, ${base}, ${mount}, ${height}, ${hours}, ${days}, ${contactors}, ${emergency}, ${dimmer}, ${timer}, ${ambient}, ${motion}, ${urls}, ${notes}`;
   const row     = dataStr + '\n';
 
   return row;
