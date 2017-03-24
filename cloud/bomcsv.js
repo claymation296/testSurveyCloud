@@ -205,8 +205,8 @@ const fixtureRow = (areaKey, fixKey, fixture) => {
   if (photos && typeof photos === 'object') {
     const photoKeys = Object.keys(photos);
     urls = photoKeys.reduce((prevStr, currPhotoKey) => {
-      if (!photos[key].savedUrl) { return prevStr; }
-      prevStr += `${photos[key].savedUrl}_`;
+      if (!photos[currPhotoKey].savedUrl) { return prevStr; }
+      prevStr += `${photos[currPhotoKey].savedUrl}_`;
       return prevStr;
     }, '');
   }
