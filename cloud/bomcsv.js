@@ -189,16 +189,14 @@
           // }
 
 
-const firstRow = 'Area, Fixture Type, Fixture Qty, Fixture Color, Lamp Qty, Kelvin, Watts, Volts, Base, Mount, Height, Hours, Days, Contactors, Emergency, Dimmer, Timer, Light Sensor, Motion Sensor, Photos, Notes\n';
+const firstRow = 'Area, Catagory, Type, Fixture Qty, Fixture Color, Lamp Qty, Kelvin, Watts, Volts, Base, Mount, Height, Hours, Days, Contactors, Emergency, Dimmer, Timer, Light Sensor, Motion Sensor, Photos, Notes\n';
 
 
 const nameFromKey = key => key.split('_').join(' ');
 
 
-const fixtureRow = (areaKey, fixKey, fixture) => {
-  const area = nameFromKey(areaKey);
-  const type = nameFromKey(fixKey);
-  const {qty, color, lamps, kelvin, watts, volts, base, mount, height, hours, days, contactors, emergency, dimmer, timer, ambient, motion, photos, notes} = fixture;
+const fixtureRow = fixture => {
+  const {area, catagory, type, qty, color, lamps, kelvin, watts, volts, base, mount, height, hours, days, contactors, emergency, dimmer, timer, ambient, motion, photos, notes} = fixture;
 
   let urls = '';
 
@@ -206,12 +204,12 @@ const fixtureRow = (areaKey, fixKey, fixture) => {
     const photoKeys = Object.keys(photos);
     urls = photoKeys.reduce((prevStr, currPhotoKey) => {
       if (!photos[currPhotoKey].savedUrl) { return prevStr; }
-      prevStr += `${photos[currPhotoKey].savedUrl}_`;
+      prevStr += `${photos[currPhotoKey].savedUrl} `; // delibrate space seperator at end
       return prevStr;
     }, '');
   }
   
-  const dataStr = `${area}, ${type}, ${qty}, ${color}, ${lamps}, ${kelvin}, ${watts}, ${volts}, ${base}, ${mount}, ${height}, ${hours}, ${days}, ${contactors}, ${emergency}, ${dimmer}, ${timer}, ${ambient}, ${motion}, ${urls}, ${notes}`;
+  const dataStr = `${area}, ${catagory}, ${type}, ${qty}, ${color}, ${lamps}, ${kelvin}, ${watts}, ${volts}, ${base}, ${mount}, ${height}, ${hours}, ${days}, ${contactors}, ${emergency}, ${dimmer}, ${timer}, ${ambient}, ${motion}, ${urls}, ${notes}`;
   const row     = dataStr + '\n';
 
   return row;
@@ -222,7 +220,7 @@ const areaRows = (bom, area) => {
   const fixtureKeys = Object.keys(bom.areas[area].fixtures);
 
   const rows = fixtureKeys.reduce((prevRow, currFixKey) => {
-    prevRow += fixtureRow(area, currFixKey, bom.fixtures[currFixKey][area]);
+    prevRow += fixtureRow(bom.fixtures[currFixKey][area]);
     return prevRow;
   }, '');
   return rows;
