@@ -799,4 +799,91 @@ Parse.Cloud.define('signup', (request, response) => {
 });
 
 
+
+
+
+
+
+
+
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%% 'invite' is current for v0.3.3 %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// invite: 
+//        sends an email to another surveyor containing a url link to the client app
+//        channel page that has the channel's key in the url parameter
+//        the key is injected into the app which then connects the invited user to 
+//        the same firebase realtime database channel as the user who sent the invitation 
+Parse.Cloud.define('invite', (request, response) => {
+  const {params, user}   = request;
+  const {channel, email} = params;
+  // setup email generator instance
+  const mailer = new Mailer(private.username, private.pw);
+  // rendered in email body
+  const repName  = `${user.get('first')} ${user.get('last')}`;
+  const repEmail = user.get('username');
+  // user.moreData is a pointer to the 'Trusted' Class row that contains the 
+  // rep's company name
+  const RepData      = Parse.Object.extend('Trusted');
+  const repDataQuery = new Parse.Query(RepData);
+  // user.moreData === Trusted.objectId
+  repDataQuery.get(user.get('moreData'), {useMasterKey: true}).then(repData => {
+
+    const repPhone = repData.get('phone');
+
+
+    // production client
+    
+    // const body = `<p>${repName} would like to collaborate with you using the REDAAP web app.</p> 
+    //               <p>Click the link below in order to connect REDAAP in realtime.</p>
+    //               <div style="margin: 32px 0px;">
+    //                 <a href="https://www.redaap.com/#!/channel/?${channel}">Link Apps</a>
+    //               </div>
+    //               <div style="margin: 32px 0px;">
+    //                 <div>${repName}</div>
+    //                 <div>TEU Services, Inc.</div>
+    //                 <div>${repPhone}</div>
+    //                 <div>${repEmail}</div>
+    //               </div>`;
+
+
+    // test client
+
+    const body = `<p>${repName} would like to collaborate with you using the REDAAP web app.</p> 
+                  <p>Click the link below in order to connect REDAAP in realtime.</p>
+                  <div style="margin: 32px 0px;">
+                    <a href="https://www.redaap.teuservices.com/#!/channel/?${channel}">Link Apps</a>
+                  </div>
+                  <div style="margin: 32px 0px;">
+                    <div>${repName}</div>
+                    <div>TEU Services, Inc.</div>
+                    <div>${repPhone}</div>
+                    <div>${repEmail}</div>
+                  </div>`;
+
+    // create and send the email                             
+    return mailer.
+      mail().
+      property('to',       email).
+      property('from',    'REDAAP').
+      property('subject', 'REDAAP collaboration invitation').
+      property('html',     body).
+      send();
+
+  }).then(() => {
+    response.success('invite email sent!');
+  }).catch(error => {
+    response.error(error);
+  }); 
+});
+
+
+
+
+
+
+
+
+
 /////////// end ////////////////////////////////
