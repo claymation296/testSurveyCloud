@@ -885,5 +885,88 @@ Parse.Cloud.define('invite', (request, response) => {
 
 
 
+// ??????????????? change httpRequest url from https://test.redaap.net... ??????????
+// ??????????????? to https://redaap.net... for production                ??????????
+
+
+// Gridstore file adapter delete files one at a time when obj is deleted from dashboard
+Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
+  const allColKeys = Object.keys(request.object.attributes);
+
+  const lightKeys = allColKeys.filter(key => key !== 'createdAt' && key !== 'updatedAt');
+
+  const promises = lightKeys.map(light => {
+    const fileName = request.object.get(light).name();
+
+    return Parse.Cloud.httpRequest({
+      method: 'DELETE',
+      url:    'https://test.redaap.net/parse/files/' + fileName,
+      headers: {
+        'X-Parse-Application-Id': private.appID,
+        'X-Parse-Master-Key':     private.masterKey
+      }
+    });
+  });
+
+  Parse.Promise.when(promises).
+    then(responses => {
+      request.log.info(responses.length + ' file(s) deleted from MLphotos');
+      response.success();
+    }).
+    catch(error => {
+      request.log.error('Delete failed with response code ' + error.data.code);
+      response.error(error);
+    });
+});
+
+
+
+
+// delete files from AWS S3 storage bucket when obj is deleted from table
+
+
+
+
+// // I have a class called "classContainingFileAttr" which contains a column "pfFilecolumn" that's of PFFile type. When I delete that class object on Parse server, the file still exists in S3, so I would like to delete that orphaned file in order to save space.
+
+// // in packages.json, add the following:
+// // "aws-sdk": "latest"
+
+// // in main.js, add the following:
+// var AWS = require('aws-sdk');
+
+// AWS.config.update({
+// accessKeyId : 'xxxxx',
+// secretAccessKey : 'xxxxx'
+// });
+// AWS.config.region = 'xxxxxx';
+
+// function deleteS3File( fn ) {
+// var bucketInstance = new AWS.S3();
+// var params = {
+// Bucket: 'elasticbeanstalk-xxxxxxxx',
+// Key: 'images/' + fn // my image files are under /images folder
+// };
+// bucketInstance.deleteObject(params, function (err, data) {
+// if (err) {
+// console.log("deleteS3File - Check if you have sufficient permissions : "+err);
+// }
+// // else {
+// // console.log("deleteS3File - File deleted successfully = images/" + fn + ", with error: " + err);
+// // }
+// });
+// }
+
+// // clean up orphaned file on S3
+// Parse.Cloud.beforeDelete("myClass", function(request) {
+// deleteS3File( request.object.get("pfFilecolumn").name() );
+// });
+
+
+
+
+
+
+
 
 /////////// end ////////////////////////////////
