@@ -83,7 +83,7 @@ Parse.Cloud.define('sendBom', (request, response) => {
 
   }).then(() => {  
 
-    const Saved = Parse.Object.extend('savedBom');
+    const Saved = Parse.Object.extend('SavedBom');
     const saved = new Saved();
 
 
@@ -571,7 +571,7 @@ Parse.Cloud.define('pricing', (request, response) => {
 // photos:
 //        labeled photos for machine learning algorithm training
 //        each image is saved by the front-end fileUpload() function inside woker.js
-//        because cloud code will no accept much raw data as a payload
+//        because cloud code will not accept much raw data as a payload
 //        The workaround solutions requires the images to be uploaded/saved to Parse by
 //        using the js api to save each Parse.File then this cloud func to associate the
 //        files to a Parse.Object
@@ -585,7 +585,7 @@ Parse.Cloud.define('photos', (request, response) => {
   const names  = {};
   let columns  = [];
   // creates a new row in the 'MLphotos' class so any duplicate photos
-  // will have their own rows since only one file can be associeated
+  // will have their own rows since only one file can be associated
   // per column
   const saveRow = cols => {
     // create new row
@@ -905,6 +905,16 @@ Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
         'X-Parse-Application-Id': private.appID,
         'X-Parse-Master-Key':     private.masterKey
       }
+
+
+      // test this with no call to response.success first
+      // headers: {
+      //   'X-Parse-Application-Id': process.env.APP_ID,
+      //   'X-Parse-Master-Key':     process.env.MASTER_KEY
+      // }
+
+
+      
     });
   });
 
@@ -923,9 +933,6 @@ Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
 
 
 // delete files from AWS S3 storage bucket when obj is deleted from table
-
-
-
 
 // // I have a class called "classContainingFileAttr" which contains a column "pfFilecolumn" that's of PFFile type. When I delete that class object on Parse server, the file still exists in S3, so I would like to delete that orphaned file in order to save space.
 
@@ -958,7 +965,7 @@ Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
 // }
 
 // // clean up orphaned file on S3
-// Parse.Cloud.beforeDelete("myClass", function(request) {
+// Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
 // deleteS3File( request.object.get("pfFilecolumn").name() );
 // });
 
