@@ -271,8 +271,10 @@ Parse.Cloud.define('review', (request, response) => {
     // create and send the email 
     return mailer.
       mail().
-      property('to',      'thomas@redaap.com').
-      property('toName',  'Thomas Carpenter').
+      // property('to',      'thomas@redaap.com').
+      // property('toName',  'Thomas Carpenter').
+      property('to',      'claymation296@gmail.com').
+      property('toName',  'Clay').
       property('from',    'REDAAPReview').
       property('subject', 'Please Review').
       property('html',     body).
@@ -889,6 +891,58 @@ Parse.Cloud.define('invite', (request, response) => {
 // ??????????????? to https://redaap.net... for production                ??????????
 
 
+
+
+
+
+// Gridstore file adapter delete files one at a time when obj is deleted from dashboard
+Parse.Cloud.beforeDelete('QuotesToReview', (request, response) => {
+  const fileName = request.object.get('pdf').name();
+
+  Parse.Cloud.httpRequest({
+    method: 'DELETE',
+    url:    'https://test.redaap.net/parse/files/' + fileName,
+    headers: {
+      'X-Parse-Application-Id': private.appID,
+      'X-Parse-Master-Key':     private.masterKey
+    }
+  }).
+  then(() => {
+    request.log.info('pdf file deleted from QuotesToReview');
+    response.success();
+  }).
+  catch(error => {
+    request.log.error('QuotesToReview beforeDelete failed with response code ' + error.data.code);
+    response.error(error);
+  });
+});
+
+
+
+// Gridstore file adapter delete files one at a time when obj is deleted from dashboard
+Parse.Cloud.beforeDelete('SentQuotes', (request, response) => {
+  const fileName = request.object.get('pdf').name();
+
+  Parse.Cloud.httpRequest({
+    method: 'DELETE',
+    url:    'https://test.redaap.net/parse/files/' + fileName,
+    headers: {
+      'X-Parse-Application-Id': private.appID,
+      'X-Parse-Master-Key':     private.masterKey
+    }
+  }).
+  then(() => {
+    request.log.info('pdf file deleted from SentQuotes');
+    response.success();
+  }).
+  catch(error => {
+    request.log.error('SentQuotes beforeDelete failed with response code ' + error.data.code);
+    response.error(error);
+  });
+});
+
+
+
 // Gridstore file adapter delete files one at a time when obj is deleted from dashboard
 Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
   const allColKeys = Object.keys(request.object.attributes);
@@ -905,16 +959,6 @@ Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
         'X-Parse-Application-Id': private.appID,
         'X-Parse-Master-Key':     private.masterKey
       }
-
-
-      // test this with no call to response.success first
-      // headers: {
-      //   'X-Parse-Application-Id': process.env.APP_ID,
-      //   'X-Parse-Master-Key':     process.env.MASTER_KEY
-      // }
-
-
-      
     });
   });
 
@@ -924,7 +968,7 @@ Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
       response.success();
     }).
     catch(error => {
-      request.log.error('Delete failed with response code ' + error.data.code);
+      request.log.error('MLphotos beforeDelete failed with response code ' + error.data.code);
       response.error(error);
     });
 });
