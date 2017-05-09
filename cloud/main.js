@@ -3,12 +3,13 @@
 // use request.log.info() in lieu of console.log()
 
 
-const utils       = require('./utilities.js');
-const Mailer      = require('./mailer.js'); // https://github.com/m1gu3l/parse-sendgrid-mailer
-const redaapPDF   = require('./redaappdf.js');
-const private     = require('../private-credentials/private.js');
-const pricingJs   = require('./pricing.js');
-const bomCsv      = require('./bomcsv.js');
+const utils     = require('./utilities.js');
+const Mailer    = require('./mailer.js'); // https://github.com/m1gu3l/parse-sendgrid-mailer
+const redaapPDF = require('./redaappdf.js');
+const private   = require('../private-credentials/private.js');
+const pricingJs = require('./pricing.js');
+const bomCsv    = require('./bomcsv.js');
+// const admin     = require('./firebase-admin');
 
 
 
@@ -749,6 +750,54 @@ Parse.Cloud.define('search', (request, response) => {
     response.error(error);
   }); 
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // login:
+// //        create a Firebase custom token by using the Parse.User.id as the uid
+// //        that Firebase admin.auth().createCustomToken(uid) expects
+// Parse.Cloud.define('login', (request, response) => {
+//   const {email, password} = request.params;
+
+//   Parse.User.login(email, password).
+//     then(user => {
+//       return admin.auth().createCustomToken(user.id).
+//         then(customToken => ({user, customToken}));
+//     }).
+//     then(({user, customToken}) => {
+//       response.success(user, customToken);
+//     }).
+//     catch(error => {
+//       response.error(error);
+//     }); 
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
