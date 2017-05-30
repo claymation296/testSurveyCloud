@@ -15,6 +15,87 @@ const bomCsv    = require('./bomcsv.js');
 
 
 
+// bomSearch:
+//        search the db for previously saved surveys for editing inside the app
+Parse.Cloud.define('bomSearch', (request, response) => {
+  // only allow users from the same company to search for and edit each others surveys
+  const {params, user}          = request;
+  const {userSurveys, col, str} = params;
+  
+
+  const runQuery = (classStr, moreData) => {
+    const classObj = Parse.Object.extend(classStr);
+    const query    = new Parse.Query(classObj);
+    // restrict to only same company data
+    query.equalTo('repCompanyName', moreData.get('repCompanyName'));
+
+    if (userSurveys) {
+      query.equalTo('repFirstName', user.get('first').toLowerCase());
+      query.equalTo('repLastName', user.get('last').toLowerCase());
+    }
+    // optional filtering of survey query by user
+    // they can provide an extra column to search and string to match
+    // search for both the all lower cased string as well as the same string
+    // with the first letter capitalized
+    if (col && str) {
+      if (col === 'orderNum') {
+        query.equalTo('orderNum', Number(str));
+      } else {
+        // normalize user input string for search
+        const lowerCaseString = str.toLowerCase();
+        // add constraints to both queries
+        query.startsWith(col, lowerCaseString);
+      }
+    }
+    // pass data back in chronological order of newest first
+    query.descending('createdAt');
+    query.limit(10);
+
+    return query.find();
+  };
+
+  // the trusted class is used to sign up new users and also contains sensitive info about
+  // each user including the company they work for
+  // use the company data in order to restrict any query to only those that belong to the
+  // same company as the user who is requesting the data
+  const Trusted      = Parse.Object.extend('Trusted');
+  const trustedQuery = new Parse.Query(Trusted);
+  // user.moreData contains the objectId of the Trusted Class object that is tied to user
+  // it has the rep's company name which is used to restrict the search to surveys
+  // that belong to that company only
+  trustedQuery.get(user.get('moreData'), {useMasterKey: true}).
+    then(moreData => {
+      // terminate the promise if there is no signed in user
+      if (!user) {
+        return Parse.Promise.error('{"message": "you must sign up or log in ' + 
+          'before you can use this feature"}');
+      }
+
+      return runQuery('SavedBom', moreData);
+    }).
+    then(saved => {
+      const results = {saved};
+      // check if no results were found
+      if (!saved.length) {
+        return Parse.Promise.error('{"message": "we could not find the surveys you searched for"}');
+      }
+
+      response.success(results);
+    }).
+    catch(error => {
+      response.error(error);
+    }); 
+});
+
+
+
+
+
+
+
+
+
+
 
 // sendBom: 
 //        receives client and survey data as well as a signature capture
@@ -100,13 +181,14 @@ Parse.Cloud.define('sendBom', (request, response) => {
 
     const clientKeys = Object.keys(client);
     clientKeys.forEach(key => {
-      saved.set(key, client[key]);
+      const value = client[key] ? client[key].toLowerCase() : null;
+      saved.set(key, value);
     });
 
     saved.set('repCompanyName', repData.get('repCompanyName'));
     saved.set('rep',            user);
-    saved.set('repFirstName',   user.get('first'));
-    saved.set('repLastName',    user.get('last'));
+    saved.set('repFirstName',   user.get('first').toLowerCase());
+    saved.set('repLastName',    user.get('last').toLowerCase());
     saved.set('bom',            bom);
     saved.set('client',         client);
      
@@ -648,7 +730,7 @@ Parse.Cloud.define('photos', (request, response) => {
 
 // search:
 //        search the db for previously saved surveys for editing inside the app
-Parse.Cloud.define('search', (request, response) => {
+Parse.Cloud.define('quoteSearch', (request, response) => {
   // only allow users from the same company to search for and edit each others surveys
   const {params, user}          = request;
   const {userSurveys, col, str} = params;
@@ -682,7 +764,7 @@ Parse.Cloud.define('search', (request, response) => {
         // normalize user input string for search
         const lowerCaseString = str.toLowerCase();
         // make a capitalized version of the str
-        const capQueryString = utils.capFirst(str);
+        const capQueryString  = utils.capFirst(str);
         // make a second query for the case where the user wants to filter the 
         // results by SurveyData Class column
         // in this case, search for the results filtered by an all lowercase string
