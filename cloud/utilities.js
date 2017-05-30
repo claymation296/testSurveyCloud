@@ -64,7 +64,8 @@ module.exports = {
 
     const clientKeys = Object.keys(client);
     clientKeys.forEach(key => {
-      dbClass.set(key, client[key]);
+      const value = client[key] ? client[key].toLowerCase() : null;
+      dbClass.set(key, value);
     });
 
     if (orderNum) {
@@ -74,14 +75,15 @@ module.exports = {
     	dbClass.set('pdf', pdfFile);
     }
 
+    dbClass.set('client',         client);
     dbClass.set('pricing',        pricing);
     dbClass.set('monthly',        Number(pricing.grandMonthly));
     dbClass.set('quantity',       pricing.totalQuantity);
     dbClass.set('term',           Number(pricing.term));
     dbClass.set('repCompanyName', repData.get('repCompanyName'));
     dbClass.set('rep',            user);
-    dbClass.set('repFirstName',   user.get('first'));
-    dbClass.set('repLastName',    user.get('last'));
+    dbClass.set('repFirstName',   user.get('first').toLowerCase());
+    dbClass.set('repLastName',    user.get('last').toLowerCase());
     dbClass.set('survey',         survey);
      
     return dbClass.save();
