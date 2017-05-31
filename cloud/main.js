@@ -34,16 +34,13 @@ Parse.Cloud.define('bomSearch', (request, response) => {
       query.equalTo('repLastName', user.get('last').toLowerCase());
     }
     // optional filtering of survey query by user
-    // they can provide an extra column to search and string to match
-    // search for both the all lower cased string as well as the same string
-    // with the first letter capitalized
+    // they can provide an extra column to search and string to match search
     if (col && str) {
       if (col === 'orderNum') {
         query.equalTo('orderNum', Number(str));
       } else {
         // normalize user input string for search
         const lowerCaseString = str.toLowerCase();
-        // add constraints to both queries
         query.startsWith(col, lowerCaseString);
       }
     }
@@ -181,7 +178,9 @@ Parse.Cloud.define('sendBom', (request, response) => {
 
     const clientKeys = Object.keys(client);
     clientKeys.forEach(key => {
-      const value = client[key] ? client[key].toLowerCase() : null;
+      const value = (client[key] && typeof client[key] === 'string') ?
+                     client[key].toLowerCase() : 
+                     client[key];
       saved.set(key, value);
     });
 
@@ -726,7 +725,9 @@ Parse.Cloud.define('photos', (request, response) => {
 
 
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%% 'search' is current for v0.4.6 %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%% 'quoteSearch' is current for v0.6.35 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // search:
 //        search the db for previously saved surveys for editing inside the app
@@ -746,62 +747,31 @@ Parse.Cloud.define('quoteSearch', (request, response) => {
   let moreData;
   const results = {};
 
-  const runBothQueries = (lowerCaseQuery, capitalizedQuery) => {
+  const runQuery = classStr => {
+    const classObj = Parse.Object.extend(classStr);
+    const query    = new Parse.Query(classObj);
     // restrict to only same company data
-    lowerCaseQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
+    query.equalTo('repCompanyName', moreData.get('repCompanyName'));
     if (userSurveys) {
-      lowerCaseQuery.equalTo('repFirstName', user.get('first').toLowerCase());
-      lowerCaseQuery.equalTo('repLastName', user.get('last').toLowerCase());
+      query.equalTo('repFirstName', user.get('first').toLowerCase());
+      query.equalTo('repLastName', user.get('last').toLowerCase());
     }
     // optional filtering of survey query by user
-    // they can provide an extra column to search and string to match
-    // search for both the all lower cased string as well as the same string
-    // with the first letter capitalized
+    // they can provide an extra column to search and string to match search
     if (col && str) {
       if (col === 'orderNum') {
-        lowerCaseQuery.equalTo('orderNum', Number(str));
+        query.equalTo('orderNum', Number(str));
       } else {
         // normalize user input string for search
         const lowerCaseString = str.toLowerCase();
-        // make a capitalized version of the str
-        const capQueryString  = utils.capFirst(str);
-        // make a second query for the case where the user wants to filter the 
-        // results by SurveyData Class column
-        // in this case, search for the results filtered by an all lowercase string
-        // as well as the same string with its first letter capitalized to make 
-        // the search more case insensitive
-        capitalizedQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
-
-        if (userSurveys) {
-          capitalizedQuery.equalTo('repFirstName', user.get('first').toLowerCase());
-          capitalizedQuery.equalTo('repLastName', user.get('last').toLowerCase());
-        }
-        // add constraints to both queries
-        lowerCaseQuery.startsWith(col, lowerCaseString);
-        capitalizedQuery.startsWith(col, capQueryString);
-        // Parse allows the union of two seperate queries with the Parse.Query.or method
-        const bothQueries = Parse.Query.or(lowerCaseQuery, capitalizedQuery);
-        // pass data back in chronological order of newest first
-        bothQueries.descending('createdAt');
-        bothQueries.limit(10);
-
-        return bothQueries.find();
+        query.startsWith(col, lowerCaseString);
       }
     }
     // pass data back in chronological order of newest first
-    lowerCaseQuery.descending('createdAt');
-    lowerCaseQuery.limit(10);
+    query.descending('createdAt');
+    query.limit(10);
 
-    return lowerCaseQuery.find();
-  };
-
-
-  const upperAndLowerCaseQueries = classStr => {
-    const classObj   = Parse.Object.extend(classStr);
-    const lowerQuery = new Parse.Query(classObj);
-    const upperQuery = new Parse.Query(classObj);
-
-    return runBothQueries(lowerQuery, upperQuery); 
+    return query.find();
   };
 
 
@@ -813,13 +783,13 @@ Parse.Cloud.define('quoteSearch', (request, response) => {
         'before you can use this feature"}');
     }
     // cannot promise.all or promise.when with Parse.Query.or
-    return upperAndLowerCaseQueries('SavedForLater');
+    return runQuery('SavedForLater');
   }).then(saved => {
     results.saved = saved;
-    return upperAndLowerCaseQueries('QuotesToReview');
+    return runQuery('QuotesToReview');
   }).then(review => {
     results.review = review;
-    return upperAndLowerCaseQueries('SentQuotes');
+    return runQuery('SentQuotes');
   }).then(sent => {
     results.sent = sent;
     // check if no results were found and if email and password strings exist
@@ -832,6 +802,13 @@ Parse.Cloud.define('quoteSearch', (request, response) => {
     response.error(error);
   }); 
 });
+
+
+
+
+
+
+
 
 
 
@@ -1033,6 +1010,7 @@ Parse.Cloud.beforeDelete('QuotesToReview', (request, response) => {
   Parse.Cloud.httpRequest({
     method: 'DELETE',
     url:    'https://test.redaap.net/parse/files/' + fileName,
+    // url:    'https://redaap.net/parse/files/' + fileName,
     headers: {
       'X-Parse-Application-Id': private.appID,
       'X-Parse-Master-Key':     private.masterKey
@@ -1057,6 +1035,7 @@ Parse.Cloud.beforeDelete('SentQuotes', (request, response) => {
   Parse.Cloud.httpRequest({
     method: 'DELETE',
     url:    'https://test.redaap.net/parse/files/' + fileName,
+    // url:    'https://redaap.net/parse/files/' + fileName,
     headers: {
       'X-Parse-Application-Id': private.appID,
       'X-Parse-Master-Key':     private.masterKey
@@ -1086,6 +1065,7 @@ Parse.Cloud.beforeDelete('MLphotos', (request, response) => {
     return Parse.Cloud.httpRequest({
       method: 'DELETE',
       url:    'https://test.redaap.net/parse/files/' + fileName,
+      // url:    'https://redaap.net/parse/files/' + fileName,
       headers: {
         'X-Parse-Application-Id': private.appID,
         'X-Parse-Master-Key':     private.masterKey
