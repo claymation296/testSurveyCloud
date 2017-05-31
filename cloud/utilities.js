@@ -64,7 +64,9 @@ module.exports = {
 
     const clientKeys = Object.keys(client);
     clientKeys.forEach(key => {
-      const value = client[key] ? client[key].toLowerCase() : null;
+      const value = (client[key] && typeof client[key] === 'string') ?
+                     client[key].toLowerCase() : 
+                     client[key];
       dbClass.set(key, value);
     });
 

@@ -750,8 +750,8 @@ Parse.Cloud.define('quoteSearch', (request, response) => {
     // restrict to only same company data
     lowerCaseQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
     if (userSurveys) {
-      lowerCaseQuery.equalTo('repFirstName', user.get('first'));
-      lowerCaseQuery.equalTo('repLastName', user.get('last'));
+      lowerCaseQuery.equalTo('repFirstName', user.get('first').toLowerCase());
+      lowerCaseQuery.equalTo('repLastName', user.get('last').toLowerCase());
     }
     // optional filtering of survey query by user
     // they can provide an extra column to search and string to match
@@ -773,8 +773,8 @@ Parse.Cloud.define('quoteSearch', (request, response) => {
         capitalizedQuery.equalTo('repCompanyName', moreData.get('repCompanyName'));
 
         if (userSurveys) {
-          capitalizedQuery.equalTo('repFirstName', user.get('first'));
-          capitalizedQuery.equalTo('repLastName', user.get('last'));
+          capitalizedQuery.equalTo('repFirstName', user.get('first').toLowerCase());
+          capitalizedQuery.equalTo('repLastName', user.get('last').toLowerCase());
         }
         // add constraints to both queries
         lowerCaseQuery.startsWith(col, lowerCaseString);

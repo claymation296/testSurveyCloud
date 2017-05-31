@@ -5,10 +5,7 @@ const images = require('./images.js');
 
 
 
-// setup pdf and email generator instances
-const doc = new jsPDF();
-// todays date with the day of the week cut out of the date object
-const date = new Date().toLocaleDateString().split(',').slice(1).join().trim();
+
 															
 const teuContactString = `TEU Services, Inc.
 1454 Sidney Baker
@@ -120,250 +117,258 @@ const sumTallies = tallies => tallies.reduce((prev, curr) => prev + (curr ? Numb
 
 const truncate = (str, maxLength = 20) => str.length > maxLength ? `${str.slice(0, maxLength - 3)}...` : str;
 
-const setFontTypeAndSize = (type, size = 11) => {
-  doc.addFont('Arial', 'Arial', type);
-  doc.setFont('Arial', type);
-  doc.setFontSize(size);
-  doc.setTextColor(33, 33, 33);
-};
-
-const addLogos = () => {
-  // params === image file, image type, x, y, width, height
-  doc.addImage(images.redaapLogo,   'jpg', 2,   9,   54, 11);
-  doc.addImage(images.poweredByTEU, 'jpg', 142, 285, 71, 10);
-};
-
-const addProposal = order => {
-  setFontTypeAndSize('normal', 33);
-  doc.setTextColor(102, 102, 102);
-  doc.text(146, 16, 'PROPOSAL');
-  doc.setFontSize(9);
-  doc.text(146, 21, order);
-};
-
-const makeTableCols = y => {
-  setFontTypeAndSize('bold');
-  doc.text(7,   y, 'Room / Area');
-  doc.text(65,  y, 'Existing Fixtures');
-  doc.text(138, y, 'LED Upgrade');
-  doc.text(183, y, 'Fixture Count');
-
-  doc.setLineWidth(0.5);
-  doc.setDrawColor(33, 33, 33);
-  // line takes the points at either end
-  doc.line(0,   y + 3, 210, y + 3);
-  // tick marks
-  doc.line(40,  y + 3, 40,  y + 6);
-  doc.line(122, y + 3, 122, y + 6);
-  doc.line(180, y + 3, 180, y + 6);
-};
 
 
-// function with side effects that generates the table of fixtures
-// while keeping track of the page number as well as the available
-// space on each page
-const makeTable = (survey, order, monthly, tax) => {
-  setFontTypeAndSize('normal');
 
-  const startOfTableY = 108;
-  let lineCount       = 1;
-  let currentY        = startOfTableY;
-  // need two page height thresholds
-  // the first indicates the height at which the footer will no longer fit with the table
-  // on the same page 
-  // the other threshold measures when the table has reached the bottom of the current page
-  const footerThreshold     = 210;
-  const pageIsFullThreshold = 258;
-  let pushFooterToNewPage   = false;
-  // keep track of how many pages are being generated
-  let page = 1;
-  // simulate a new line operation
-  function nextLine() {
-    // spacing down 10mm
-    var newLineSpacing = 10;
-    lineCount += 1;
-    currentY  += newLineSpacing;
-  }
-  // handle adding a page based on the size of the table
-  function nextPage() {
-    doc.addPage();
-    page += 1;
-    lineCount = 1;
-    currentY  = 45;
 
-    addLogos();
-    addProposal(order);
-  }
-  // add lines of text to build a table
-  function addRow(row) {
-    setFontTypeAndSize('normal');
-    if (row.area) {
-    	doc.text(5, currentY, truncate(row.area));
-    }
-    if (row.custom) {
-      doc.text(45,  currentY, 'Custom Product $' + row.customProduct);
-      doc.text(126, currentY, 'Custom Install $' + row.customInstall);
-    } else {
-      doc.text(45,  currentY, row.fixture);
-      doc.text(126, currentY, row.replacement);
-    }
-    doc.text(188, currentY, rightJustifyNumber(row.count));
-  }
 
-  function measurePageLayout() {
-    if (currentY > pageIsFullThreshold) {
-      // start a new page
-      pushFooterToNewPage = false;
-      nextPage();
-    } else if (currentY >= footerThreshold) {
-      // push footer to next page
-      pushFooterToNewPage = true;
-      nextLine();
-    } else {
-      if (lineCount === 1) {
-        makeTableCols(currentY - 12);
-      }
-      // add another row
-      pushFooterToNewPage = false;
-      nextLine();
-    }
-  }
+module.exports.makePDF = data => {
 
-  function addBottomDividerToTable() {
-    doc.setLineWidth(0.35);
-    doc.setDrawColor(153, 153, 153);
-    // line takes the points at either end
-    doc.line(10, currentY, 198, currentY);
-  }
-  // add the fine print strings to the pdf
-  function addFinePrint() {
-    doc.setFontSize(9);
+
+  const doc = new jsPDF();
+  // todays date with the day of the week cut out of the date object
+  const date = new Date().toLocaleDateString().split(',').slice(1).join().trim();
+
+
+
+  const setFontTypeAndSize = (type, size = 11) => {
+    doc.addFont('Arial', 'Arial', type);
+    doc.setFont('Arial', type);
+    doc.setFontSize(size);
+    doc.setTextColor(33, 33, 33);
+  };
+
+  const addLogos = () => {
+    // params === image file, image type, x, y, width, height
+    doc.addImage(images.redaapLogo,   'jpg', 2,   9,   54, 11);
+    doc.addImage(images.poweredByTEU, 'jpg', 142, 285, 71, 10);
+  };
+
+  const addProposal = order => {
+    setFontTypeAndSize('normal', 33);
     doc.setTextColor(102, 102, 102);
-    doc.text(0, 235, fine);
-    setFontTypeAndSize('italic', 9);
-    doc.text(0, 265, requirements);
-  }
+    doc.text(146, 16, 'PROPOSAL');
+    doc.setFontSize(9);
+    doc.text(146, 21, order);
+  };
 
-  function addAcceptance() {
-    doc.setLineWidth(0.35);
-    doc.setDrawColor(153, 153, 153);
-    // line takes the points at either end
-    doc.line(0,   280, 90,  280);
-    doc.line(100, 280, 135, 280);
-
-    setFontTypeAndSize('normal', 9);
-    doc.text(0,   284, 'Acceptance of Proposal');
-    doc.text(100, 284, 'Date');
-  }
-
-  function addQuotedPricing() {
-    const serviceFee    = monthly - tax;
-    const serviceFeeStr = rightJustifyNumber(serviceFee, '$');
-    const taxStr        = rightJustifyNumber(tax,        '$');
-    const monthlyStr    = rightJustifyNumber(Number(monthly).toFixed(2), '$');
-
+  const makeTableCols = y => {
     setFontTypeAndSize('bold');
-    doc.text(130, 235, 'Monthly Service Fee');
-    doc.text(130, 242, 'Sales Tax');
-    doc.text(130, 249, 'Monthly Total');
+    doc.text(7,   y, 'Room / Area');
+    doc.text(65,  y, 'Existing Fixtures');
+    doc.text(138, y, 'LED Upgrade');
+    doc.text(183, y, 'Fixture Count');
 
-    setFontTypeAndSize('normal');
-    doc.text(180, 235, serviceFeeStr);
-    doc.text(180, 242, taxStr);
-    doc.text(180, 249, monthlyStr);
-  }
-
-  function addFooter() {
-    addFinePrint();
-    addAcceptance();
-    addQuotedPricing();
-  }
-
-  function addInitial() {
-    doc.setLineWidth(0.35);
-    doc.setDrawColor(153, 153, 153);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(33, 33, 33);
     // line takes the points at either end
-    doc.line(0, 280, 20, 280);
+    doc.line(0,   y + 3, 210, y + 3);
+    // tick marks
+    doc.line(40,  y + 3, 40,  y + 6);
+    doc.line(122, y + 3, 122, y + 6);
+    doc.line(180, y + 3, 180, y + 6);
+  };
 
-    setFontTypeAndSize('normal', 9);
-    doc.text(0, 284, 'Initial');
-  }
 
-  function addContinued() {
+  // function with side effects that generates the table of fixtures
+  // while keeping track of the page number as well as the available
+  // space on each page
+  const makeTable = (survey, order, monthly, tax) => {
     setFontTypeAndSize('normal');
-    doc.text(94, 284, 'continued...');
-  }  
-  // add the page number to each page
-  function addPageNumbersInitialAndContinued() {
-    const totalPages = doc.internal.getNumberOfPages();
-    // first page is the cover page so start on page 2
-    const proposalPages = totalPages - 1;
 
-    for (let i = 1; i < totalPages; i += 1) {
-      const pageNumber = 'page ' + i + ' of ' + proposalPages;
+    const startOfTableY = 108;
+    let lineCount       = 1;
+    let currentY        = startOfTableY;
+    // need two page height thresholds
+    // the first indicates the height at which the footer will no longer fit with the table
+    // on the same page 
+    // the other threshold measures when the table has reached the bottom of the current page
+    const footerThreshold     = 210;
+    const pageIsFullThreshold = 258;
+    let pushFooterToNewPage   = false;
+    // keep track of how many pages are being generated
+    let page = 1;
+    // simulate a new line operation
+    function nextLine() {
+      // spacing down 10mm
+      var newLineSpacing = 10;
+      lineCount += 1;
+      currentY  += newLineSpacing;
+    }
+    // handle adding a page based on the size of the table
+    function nextPage() {
+      doc.addPage();
+      page += 1;
+      lineCount = 1;
+      currentY  = 45;
+
+      addLogos();
+      addProposal(order);
+    }
+    // add lines of text to build a table
+    function addRow(row) {
+      setFontTypeAndSize('normal');
+      if (row.area) {
+      	doc.text(5, currentY, truncate(row.area));
+      }
+      if (row.custom) {
+        doc.text(45,  currentY, 'Custom Product $' + row.customProduct);
+        doc.text(126, currentY, 'Custom Install $' + row.customInstall);
+      } else {
+        doc.text(45,  currentY, row.fixture);
+        doc.text(126, currentY, row.replacement);
+      }
+      doc.text(188, currentY, rightJustifyNumber(row.count));
+    }
+
+    function measurePageLayout() {
+      if (currentY > pageIsFullThreshold) {
+        // start a new page
+        pushFooterToNewPage = false;
+        nextPage();
+      } else if (currentY >= footerThreshold) {
+        // push footer to next page
+        pushFooterToNewPage = true;
+        nextLine();
+      } else {
+        if (lineCount === 1) {
+          makeTableCols(currentY - 12);
+        }
+        // add another row
+        pushFooterToNewPage = false;
+        nextLine();
+      }
+    }
+
+    function addBottomDividerToTable() {
+      doc.setLineWidth(0.35);
+      doc.setDrawColor(153, 153, 153);
+      // line takes the points at either end
+      doc.line(10, currentY, 198, currentY);
+    }
+    // add the fine print strings to the pdf
+    function addFinePrint() {
+      doc.setFontSize(9);
+      doc.setTextColor(102, 102, 102);
+      doc.text(0, 235, fine);
+      setFontTypeAndSize('italic', 9);
+      doc.text(0, 265, requirements);
+    }
+
+    function addAcceptance() {
+      doc.setLineWidth(0.35);
+      doc.setDrawColor(153, 153, 153);
+      // line takes the points at either end
+      doc.line(0,   280, 90,  280);
+      doc.line(100, 280, 135, 280);
 
       setFontTypeAndSize('normal', 9);
-      doc.setPage(i + 1);
-      doc.text(0, 293, pageNumber);
+      doc.text(0,   284, 'Acceptance of Proposal');
+      doc.text(100, 284, 'Date');
+    }
 
-      if (i < proposalPages) {
-        addInitial();
-        addContinued();
+    function addQuotedPricing() {
+      const serviceFee    = monthly - tax;
+      const serviceFeeStr = rightJustifyNumber(serviceFee, '$');
+      const taxStr        = rightJustifyNumber(tax,        '$');
+      const monthlyStr    = rightJustifyNumber(Number(monthly).toFixed(2), '$');
+
+      setFontTypeAndSize('bold');
+      doc.text(130, 235, 'Monthly Service Fee');
+      doc.text(130, 242, 'Sales Tax');
+      doc.text(130, 249, 'Monthly Total');
+
+      setFontTypeAndSize('normal');
+      doc.text(180, 235, serviceFeeStr);
+      doc.text(180, 242, taxStr);
+      doc.text(180, 249, monthlyStr);
+    }
+
+    function addFooter() {
+      addFinePrint();
+      addAcceptance();
+      addQuotedPricing();
+    }
+
+    function addInitial() {
+      doc.setLineWidth(0.35);
+      doc.setDrawColor(153, 153, 153);
+      // line takes the points at either end
+      doc.line(0, 280, 20, 280);
+
+      setFontTypeAndSize('normal', 9);
+      doc.text(0, 284, 'Initial');
+    }
+
+    function addContinued() {
+      setFontTypeAndSize('normal');
+      doc.text(94, 284, 'continued...');
+    }  
+    // add the page number to each page
+    function addPageNumbersInitialAndContinued() {
+      const totalPages = doc.internal.getNumberOfPages();
+      // first page is the cover page so start on page 2
+      const proposalPages = totalPages - 1;
+
+      for (let i = 1; i < totalPages; i += 1) {
+        const pageNumber = 'page ' + i + ' of ' + proposalPages;
+
+        setFontTypeAndSize('normal', 9);
+        doc.setPage(i + 1);
+        doc.text(0, 293, pageNumber);
+
+        if (i < proposalPages) {
+          addInitial();
+          addContinued();
+        }
       }
     }
-  }
-  // will trigger the fine print to be correctly added
-  // to the last page after all of the table elements
-  // have been handled
-  const lastArea = survey.length - 1;
-  // iterate over the survey data to create the table 
-  survey.forEach((area, index) => {
-    area.fixtures.forEach((fixture, fixtureIndex) => {
-      fixture.replacements.forEach((replacement, replacementIndex) => {
-        // addRow expects {areaName, fix, repl, count}
-        // only add the areaName on the first row which is both indexes === 0
-        const areaName = ((fixtureIndex === 0 && replacementIndex === 0) || lineCount === 1) ? area.name : '';
-        const row = {
-          area:          areaName,
-          count:         replacement.count,
-          custom:        replacement.custom,
-          customInstall: replacement.customInstall,
-          customProduct: replacement.customProduct,
-          fixture:       fixture.name,
-          replacement:   replacement.name
-        };
-        
-        addRow(row);
-        measurePageLayout();
+    // will trigger the fine print to be correctly added
+    // to the last page after all of the table elements
+    // have been handled
+    const lastArea = survey.length - 1;
+    // iterate over the survey data to create the table 
+    survey.forEach((area, index) => {
+      area.fixtures.forEach((fixture, fixtureIndex) => {
+        fixture.replacements.forEach((replacement, replacementIndex) => {
+          // addRow expects {areaName, fix, repl, count}
+          // only add the areaName on the first row which is both indexes === 0
+          const areaName = ((fixtureIndex === 0 && replacementIndex === 0) || lineCount === 1) ? area.name : '';
+          const row = {
+            area:          areaName,
+            count:         replacement.count,
+            custom:        replacement.custom,
+            customInstall: replacement.customInstall,
+            customProduct: replacement.customProduct,
+            fixture:       fixture.name,
+            replacement:   replacement.name
+          };
+          
+          addRow(row);
+          measurePageLayout();
+        });
       });
+      // only include the bottom divider if the fine print is on the same page
+      // as the last line of the table
+      if (index === lastArea && !pushFooterToNewPage && lineCount !== 1) {
+        addBottomDividerToTable();
+      }
     });
-    // only include the bottom divider if the fine print is on the same page
-    // as the last line of the table
-    if (index === lastArea && !pushFooterToNewPage && lineCount !== 1) {
-      addBottomDividerToTable();
+    // catch case where there is more lines than fit on one page but less than
+    // the max rows without a footer that will fit on a single page
+    // so add another page to add the footer to
+    if (pushFooterToNewPage) {
+      nextPage();
     }
-  });
-  // catch case where there is more lines than fit on one page but less than
-  // the max rows without a footer that will fit on a single page
-  // so add another page to add the footer to
-  if (pushFooterToNewPage) {
-    nextPage();
-  }
 
-  addFooter();
-  addPageNumbersInitialAndContinued();
-};
-
-
-
-
-
-
+    addFooter();
+    addPageNumbersInitialAndContinued();
+  };
 
 
 
     
-module.exports.makePDF = data => {
+// module.exports.makePDF = data => {
   const {client, orderNum, pricing, survey, user} = data;
 	// data === {
   //    user: user,
